@@ -15,6 +15,7 @@
 #include <stdint.h>
 #include <cstdarg>
 #include <vector>
+#include <ddk/ntddcdrm.h>
 
 using namespace std;
 bool debug=false;
@@ -317,6 +318,24 @@ DWORD WINAPI blockServe(LPVOID data){
         }
         debugLog(sformat("Offset: %lld (%llx)", foffset.QuadPart, foffset.QuadPart));
         debugLog(sformat("Length: %lld (%llx)", fsize.QuadPart,  fsize.QuadPart));
+    }
+    else if (strnicmp(filename, "\\\\.\\CdRom", 9 ) == 0 && !bMemory ) // assume cdrom
+    {
+        DISK_GEOMETRY dgCDROM;
+        DWORD dwplSize = sizeof(DISK_GEOMETRY);
+        DWORD dwplBytesReturn = 0;
+        if (DeviceIoControl(fh, IOCTL_CDROM_GET_DRIVE_GEOMETRY, NULL, 0, &dgCDROM, dwplSize, &dwplBytesReturn, NULL)){
+            fsize.QuadPart = dgCDROM.Cylinders.QuadPart * dgCDROM.TracksPerCylinder * dgCDROM.SectorsPerTrack * dgCDROM.BytesPerSector;
+            debugLog(sformat("Cylinders: %lld, TracksPerCylinder: %ld, SectorsPerTrack: %ld, BytesPerSector: %ld, size: %lld",
+                dgCDROM.Cylinders.QuadPart,
+                dgCDROM.TracksPerCylinder,
+                dgCDROM.SectorsPerTrack,
+                dgCDROM.BytesPerSector,
+                fsize.QuadPart));
+        }else{
+            errorLog(sformat("Cannot determine CDROM geometry. Error: %u", GetLastError()));
+            goto error;
+        }
     }
     else if (strnicmp(filename, "\\\\.\\", 4 ) == 0 && !bMemory ) //assume a volume name like \\.\C: or \\.\HarddiskVolume1 
     {
