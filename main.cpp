@@ -22,6 +22,7 @@ bool debug=false;
 bool quiet=false;
 bool allowWrite = false;
 bool bMemory = false;
+bool bCdrom = false;
 string nbdfilename = "";
 int partitionNo=0;
 ofstream debugFile;
@@ -321,6 +322,7 @@ DWORD WINAPI blockServe(LPVOID data){
     }
     else if (strnicmp(filename, "\\\\.\\CdRom", 9 ) == 0 && !bMemory ) // assume cdrom
     {
+        bCdrom = true;
         DISK_GEOMETRY dgCDROM;
         DWORD dwplSize = sizeof(DISK_GEOMETRY);
         DWORD dwplBytesReturn = 0;
@@ -593,13 +595,11 @@ DWORD WINAPI blockServe(LPVOID data){
                 break;
             }
 
+            UCHAR *buffer = (UCHAR *)VirtualAlloc(NULL, 2048, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
             while(len > 0)
             {
                 DWORD dummy;
-                //UCHAR buffer[32768];
-                UCHAR buffer[1024];
-                //int nb = min((const int)len, (const int)32768);
-                int nb = min((const int)len, (const int)1024);
+                int nb = min((const int)len, (const int)bCdrom ? 2048 : 1024);
                 int pnt = 0;
                 bool bPad= true;
 
@@ -636,12 +636,12 @@ DWORD WINAPI blockServe(LPVOID data){
                     cur_offset.QuadPart+=nb;
                 }else{
                     // read nb to buffer;
-                    if (ReadFile(fh, buffer, nb, &dummy, NULL) == 0)
+                    if (ReadFile(fh, buffer, bCdrom ? 2048 : nb, &dummy, NULL) == 0)
                     {
                         errorLog(sformat("Failed to read from %s: %u", filename, GetLastError()));
                         break;
                     }
-                    if (dummy != nb)
+                    if (dummy != bCdrom ? 2048 : nb)
                     {
                         errorLog(sformat("Failed to read from %s: %u", filename, GetLastError()));
                         break;
@@ -656,6 +656,7 @@ DWORD WINAPI blockServe(LPVOID data){
 
                 len -= nb;
             }
+            VirtualFree(buffer, 0, MEM_RELEASE);
             if (len)    // connection was closed
                 break;
         }
