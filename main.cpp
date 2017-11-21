@@ -16,6 +16,7 @@
 #include <cstdarg>
 #include <vector>
 #include <ddk/ntddcdrm.h>
+#include <dvdcss/dvdcss.h>
 
 using namespace std;
 bool debug=false;
